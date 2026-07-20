@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+logs/
+captures/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+ATC_v57.bin
+*.bin
