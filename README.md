@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # TLSR825x OTA CLI
 
 Nativer Linux-CLI-Flasher für das klassische Telink-SDK-BLE-OTA-Protokoll.
@@ -52,3 +53,4 @@ Das Protokoll verwendet:
 ## Warum es keine automatischen Write-Retries gibt
 
 Die OTA-Characteristic verwendet `write-without-response`. Meldet der Host dabei einen Fehler, ist nicht eindeutig feststellbar, ob das Paket das Gerät bereits erreicht hat. Ein erneutes Senden desselben Adr-Index kann die Sequenzprüfung des Telink-Bootloaders auslösen. Das Tool bricht deshalb ab, statt ein möglicherweise zugestelltes Paket blind zu wiederholen.
+=======
