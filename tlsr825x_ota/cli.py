@@ -13,7 +13,8 @@ from .firmware import FirmwareError, FirmwareImage
 from .capture import capture_mtu_session
 from .diagnostics import firmware_metadata, host_diagnostics, mtu_diagnostics, write_json
 from .logging_setup import configure_logging
-from .ota import FlashOptions, OtaError, flash_firmware, inspect_device, ota_dry_run
+from .client import OTAClient
+from .ota import FlashOptions, OtaError
 from .scanner import resolve_address, scan_devices
 
 app = typer.Typer(no_args_is_help=True, help="Nativer Telink TLSR825x BLE-OTA-Flasher.")
@@ -81,7 +82,7 @@ def info(
     """OTA-Service und Characteristic eines Geräts prüfen; schreibt keine Daten."""
     try:
         address = _run(resolve_address(device, scan_timeout))
-        result = _run(inspect_device(address, timeout))
+        result = _run(OTAClient(address, timeout=timeout).info())
     except Exception as exc:
         console.print(f"[red]Diagnose fehlgeschlagen:[/red] {exc}")
         raise typer.Exit(1)
@@ -189,7 +190,7 @@ def dry_run(
     try:
         address = _run(resolve_address(device, scan_timeout))
         logger.info("Dry-Run-Ziel=%s (%s)", device, address)
-        result = _run(ota_dry_run(address, timeout, settle_delay, logger))
+        result = _run(OTAClient(address, timeout=timeout, logger=logger).dry_run(settle_delay=settle_delay))
     except Exception as exc:
         logger.exception("OTA-Dry-Run fehlgeschlagen")
         console.print(f"[red]OTA-Dry-Run fehlgeschlagen:[/red] {exc}")
@@ -257,7 +258,7 @@ def flash(
             def update(done: int, total: int, elapsed: float) -> None:
                 progress.update(task, completed=done)
 
-            result = _run(flash_firmware(address, image, options, update, logger))
+            result = _run(OTAClient(address, timeout=timeout, logger=logger).flash(image, options=options, progress=update))
     except (OtaError, RuntimeError, Exception) as exc:
         logger.exception("OTA fehlgeschlagen")
         console.print(f"[red]OTA fehlgeschlagen:[/red] {exc}")

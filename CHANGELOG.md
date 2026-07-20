@@ -2,6 +2,14 @@
 
 Alle wesentlichen Änderungen an diesem Projekt werden hier dokumentiert.
 
+## Unreleased
+
+### Geändert
+
+- `OTAClient` als öffentliche High-Level-API eingeführt.
+- Die bestehenden CLI-Befehle `info`, `dry-run` und `flash` über `OTAClient` geführt.
+- Die auf echter Hardware getestete OTA-Protokollimplementierung unverändert gelassen.
+
 ## [0.2.1] – 2026-07-20
 
 ### Hinzugefügt
