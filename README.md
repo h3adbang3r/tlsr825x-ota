@@ -1,17 +1,13 @@
-<<<<<<< HEAD
 # TLSR825x OTA CLI
 
-Nativer Linux-CLI-Flasher für das klassische Telink-SDK-BLE-OTA-Protokoll.
+Nativer Linux-CLI-Flasher und Diagnosewerkzeug für Telink-TLSR825x-BLE-Geräte.
+Das Projekt wurde mit dem Xiaomi LYWSD03MMC und der ATC/PVVX-Firmware getestet.
 
-## Sicherheit
+> **Wichtig:** Eine gültige Telink-Signatur bestätigt nicht das konkrete Gerätemodell.
+> Für das LYWSD03MMC die passende `ATC_*.bin` verwenden. `BTH_*.bin` gehört nicht
+> zu diesem Modell.
 
-Das Programm erkennt nur eine Telink-Firmware-Signatur. Es kann **nicht** zuverlässig feststellen, ob eine Firmware zum konkreten Gerät gehört.
-
-Für das Xiaomi **LYWSD03MMC** ausschließlich die passende `ATC_*.bin` verwenden. `BTH_*.bin` ist für das MJWSD05MMC und darf nicht auf das LYWSD03MMC geschrieben werden.
-
-Ein OTA-Transfer darf nicht unterbrochen werden. Gerät direkt neben den Bluetooth-Adapter legen und eine frische Batterie verwenden.
-
-## Installation unter CachyOS / fish
+## Installation unter CachyOS/fish
 
 ```fish
 python -m venv .venv
@@ -19,18 +15,83 @@ source .venv/bin/activate.fish
 python -m pip install -e .
 ```
 
-## Diagnose
+Für `capture-mtu` wird `btmon` aus `bluez-utils` benötigt.
+
+## Sichere Diagnose ohne Schreibzugriffe
 
 ```fish
 tlsr825x-ota scan --prefix ATC_
-tlsr825x-ota validate ATC_v57.bin
-tlsr825x-ota info A4:C1:38:A1:D0:36 --scan-timeout 30 --timeout 30
-tlsr825x-ota dry-run A4:C1:38:A1:D0:36 --scan-timeout 30 --timeout 30 --verbose
+
+tlsr825x-ota info A4:C1:38:A1:D0:36 \
+  --scan-timeout 30 \
+  --timeout 30
+
+tlsr825x-ota mtu-test A4:C1:38:A1:D0:36 \
+  --scan-timeout 30 \
+  --timeout 30 \
+  --observe 10 \
+  --json mtu.json
 ```
 
-## Flashen
+`mtu-test` löst **keinen OTA-Handshake** aus und führt **keine GATT-Schreibzugriffe**
+aus. Er zeigt den von Bleak gemeldeten MTU-Wert vor und nach der BlueZ-spezifischen
+Best-Effort-Ermittlung sowie die maximale Größe für Write Without Response.
 
-Erster Test ausschließlich mit einem funktionierenden Referenzgerät und der dazu passenden Firmware:
+Unter BlueZ kann `BleakClient.mtu_size` weiterhin 23 melden. Für den OTA-Transfer
+ist die entscheidende Größe `max_write_without_response_size`; das klassische
+Telink-Paket benötigt exakt 20 Byte.
+
+## Read-only-Mitschnitt mit btmon
+
+```fish
+tlsr825x-ota capture-mtu A4:C1:38:A1:D0:36 \
+  --scan-timeout 30 \
+  --timeout 30 \
+  --observe 10
+```
+
+Erzeugt beispielsweise:
+
+```text
+captures/mtu_20260720_190000/
+├── btmon.btsnoop
+├── btmon.stderr.log
+├── summary.json
+└── README.txt
+```
+
+Auswertung:
+
+```fish
+btmon --read captures/mtu_*/btmon.btsnoop
+```
+
+Falls `btmon` sofort wegen fehlender Rechte endet, den Capture-Befehl mit den
+passenden Systemberechtigungen ausführen. Der normale `mtu-test` benötigt keinen
+`btmon`-Mitschnitt.
+
+## Firmware prüfen
+
+```fish
+tlsr825x-ota validate ATC_v57.bin --json firmware.json
+```
+
+Geprüft werden Telink-Signatur, Dateigröße, Blockzahl und SHA-256. Eine
+Modellzuordnung ist damit nicht möglich.
+
+## OTA-Dry-Run
+
+```fish
+tlsr825x-ota dry-run A4:C1:38:A1:D0:36 \
+  --scan-timeout 30 \
+  --timeout 30 \
+  --verbose
+```
+
+Der Dry-Run sendet den OTA-Handshake und liest den Status, überträgt aber keine
+Firmwareblöcke.
+
+## Firmware übertragen
 
 ```fish
 tlsr825x-ota flash ATC_v57.bin \
@@ -43,14 +104,19 @@ tlsr825x-ota flash ATC_v57.bin \
   --verbose
 ```
 
-Das Protokoll verwendet:
+Der Transfer verwendet feste 16-Byte-Firmwareblöcke in 20-Byte-GATT-Paketen.
+Automatische Wiederholungen von Write-Without-Response-Paketen erfolgen bewusst
+nicht, weil nicht sicher feststellbar ist, ob ein Paket das Gerät bereits erreicht
+hat.
 
-- `00ff`, danach `01ff` als Startkommandos
-- pro Paket: 2 Byte Adr-Index, 16 Byte Firmwaredaten, 2 Byte CRC-16/MODBUS
-- Status `00` als Erfolgsmeldung
-- als Ende: `02ff`, letzter Adr-Index, bitweise 16-Bit-Invertierung des Adr-Index
+## Entwicklung
 
-## Warum es keine automatischen Write-Retries gibt
+```fish
+python -m pip install -e . pytest pytest-asyncio build
+pytest -q
+python -m build
+```
 
-Die OTA-Characteristic verwendet `write-without-response`. Meldet der Host dabei einen Fehler, ist nicht eindeutig feststellbar, ob das Paket das Gerät bereits erreicht hat. Ein erneutes Senden desselben Adr-Index kann die Sequenzprüfung des Telink-Bootloaders auslösen. Das Tool bricht deshalb ab, statt ein möglicherweise zugestelltes Paket blind zu wiederholen.
-=======
+## Lizenz
+
+MIT

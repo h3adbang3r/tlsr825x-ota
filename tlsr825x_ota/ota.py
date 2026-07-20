@@ -10,6 +10,7 @@ from bleak import BleakClient
 
 from .constants import OTA_CHARACTERISTIC_UUID, OTA_SERVICE_UUID, START_COMMANDS
 from .firmware import FirmwareImage
+from .diagnostics import collect_device_information
 from .protocol import build_data_packet, build_finish_packet
 
 ProgressCallback = Callable[[int, int, float], None]
@@ -93,6 +94,7 @@ async def inspect_device(address: str, timeout: float = 20.0) -> dict[str, objec
         service = client.services.get_service(OTA_SERVICE_UUID)
         characteristic = client.services.get_characteristic(OTA_CHARACTERISTIC_UUID)
         mtu, mtu_note = await _acquire_mtu_best_effort(client)
+        device_information = await collect_device_information(client)
         return {
             "connected": client.is_connected,
             "mtu": mtu,
@@ -102,6 +104,7 @@ async def inspect_device(address: str, timeout: float = 20.0) -> dict[str, objec
             "properties": list(characteristic.properties) if characteristic else [],
             "max_write_without_response_size": characteristic.max_write_without_response_size if characteristic else None,
             "services": _service_dump(client),
+            "device_information": device_information,
         }
 
 
@@ -135,6 +138,7 @@ async def ota_dry_run(
         status = await _read_status(client, context="nach Handshake")
         logger.info("OTA-Status nach Handshake: %s", status.hex())
         expected_shutdown = True
+        device_information = await collect_device_information(client)
         return {
             "connected": client.is_connected,
             "mtu": mtu,
@@ -175,11 +179,14 @@ async def flash_firmware(
     started = time.monotonic()
     disconnected = asyncio.Event()
     finish_sent = False
+    closing_locally = False
 
     def on_disconnect(_: BleakClient) -> None:
+        if closing_locally:
+            return
         disconnected.set()
         if finish_sent:
-            logger.info("Gerät hat nach OTA-Ende getrennt bzw. neu gestartet.")
+            logger.info("Remote-Disconnect nach OTA-Ende beobachtet.")
         else:
             logger.error("BLE-Verbindung vor dem OTA-Ende getrennt.")
 
@@ -238,10 +245,12 @@ async def flash_firmware(
         except TimeoutError:
             logger.info("Innerhalb von %.1f s kein Disconnect beobachtet.", options.finish_wait)
 
+        remote_disconnect = disconnected.is_set()
+        closing_locally = True
         return {
             "blocks_written": firmware.block_count,
             "last_block": firmware.block_count - 1,
             "finish_packet": finish,
-            "disconnected_after_finish": disconnected.is_set(),
+            "disconnected_after_finish": remote_disconnect,
             "elapsed": time.monotonic() - started,
         }

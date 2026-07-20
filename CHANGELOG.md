@@ -1,21 +1,32 @@
 # Changelog
 
-## 0.2.0 – 2026-07-20
+Alle wesentlichen Änderungen an diesem Projekt werden hier dokumentiert.
 
-- vollständiger klassischer Telink-SDK-OTA-Datenstrom auf Basis des dokumentierten 20-Byte-PDU-Formats
-- Handshake-Status wird vor dem ersten Firmwareblock zwingend geprüft
-- Status `00` wird während und nach dem Datentransfer validiert
-- abschließende Statusabfrage auch dann, wenn die Blockzahl nicht durch das Prüfintervall teilbar ist
-- OTA-Endepaket enthält letzten Adr-Index und dessen 16-Bit-Invertierung
-- erwarteter Neustart/Disconnect nach OTA-Ende wird protokolliert
-- automatische Write-Wiederholungen entfernt: Wiederholen eines möglicherweise bereits zugestellten Write Commands könnte den Adr-Index doppelt senden
-- irreführende Disconnect-Warnung beim normalen Verlassen des Dry-Runs beseitigt
-- zusätzliche Protokolltests
+## [0.2.1] – 2026-07-20
 
-## 0.1.1 – 2026-07-20
+### Hinzugefügt
 
-- Service-Dump, MTU-Ermittlung und Dry-Run ergänzt
+- `mtu-test`: vollständig schreibfreier BLE-/MTU-Diagnosetest ohne OTA-Handshake.
+- Beobachtung von `mtu_size` und `max_write_without_response_size` über mehrere Sekunden.
+- Best-Effort-MTU-Ermittlung über das BlueZ-Backend von Bleak.
+- `capture-mtu`: paralleler `btmon`-Mitschnitt als BTSnoop-Datei plus JSON-Zusammenfassung.
+- Auslesen standardisierter Device-Information-Characteristics, sofern vorhanden.
+- JSON-Export für `info`, `mtu-test` und `validate`.
+- SHA-256-Ausgabe bei der Firmwarevalidierung.
+- GitHub-Actions-Testmatrix für Python 3.11 bis 3.14.
+- Dokumentation zur MTU-Diagnose unter BlueZ.
 
-## 0.1.0 – 2026-07-20
+### Behoben
 
-- erste Projektversion
+- Ein lokaler Disconnect beim Verlassen des Bleak-Kontextes wird nicht mehr fälschlich
+  als beobachteter Geräte-Neustart protokolliert.
+
+### Sicherheit
+
+- `mtu-test` und `capture-mtu` führen keinen OTA-Handshake und keine
+  GATT-Schreibzugriffe aus.
+
+## [0.2.0] – 2026-07-20
+
+- Vollständiger Telink-OTA-Datenstrom mit 16-Byte-Blöcken, CRC, Statusabfragen und
+  Abschlusskommando.
